@@ -155,7 +155,7 @@ def draw_line7(img_mat, x0, y0, x1, y1, count):
             y += y_update
 
 
-def draw_line8(img_mat, x0, y0, x1, y1, count): # полностью целочисленный метод, работает как мой адвокат порекомендовал не продолжать шутку
+def draw_line8(img_mat, x0, y0, x1, y1, count): # полностью целочисленныйa метод, работает как мой адвокат порекомендовал не продолжать шутку
     xchange = False
     if abs(x0 - x1) < abs(y0 - y1):
         x0, y0 = y0, x0
