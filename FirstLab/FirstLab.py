@@ -138,7 +138,6 @@ def draw_line7(img_mat, x0, y0, x1, y1, count):
     if x0 > x1:
         x0, x1 = x1, x0
         y0, y1 = y1, y0
-
     y = y0
     dy = 2.0*(x1-x0)*abs(y1 - y0)/(x1 - x0)
     derror = 0.0
