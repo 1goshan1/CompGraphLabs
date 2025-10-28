@@ -78,6 +78,7 @@ for s in file:
         v.append(list(map(float, spl[1:])))
         v[-1][0], v[-1][1], v[-1][2] = rotate(v[-1][0], v[-1][1], v[-1][2], 0, pi+pi/4, 0, 0, -0.05, 7)
 
+
     if spl[0] == "f":
         v_index = [int(sp.split("/")[0]) for sp in spl[1:]]
         vt_index = [int(sp.split("/")[1]) for sp in spl[1:]]
