@@ -76,7 +76,7 @@ for s in file:
         vn.append(list(map(float, spl[1:])))
     if spl[0] == "v":  # ОООО ZZZZZZZ ZZZ ГОЙДА
         v.append(list(map(float, spl[1:])))
-        v[-1][0], v[-1][1], v[-1][2] = rotate(v[-1][0], v[-1][1], v[-1][2], 0, pi+pi/4, 0, 0, -0.05, 7)
+        v[-1][0], v[-1][1], v[-1][2] = rotate(v[-1][0], v[-1][1], v[-1][2], 0, pi+pi/4, 0, 0, -0.05, 0.1)
 
 
     if spl[0] == "f":
@@ -120,8 +120,8 @@ def projective(ax, ay, u0, v0, x, y, z):
     return (ax*x/z + u0, ay*y/z + v0, z)
 
 def scaleCoords(coords):
-    proj = projective(60000, 60000, width/2, height/2, coords[0], coords[1], coords[2])
-    return (proj[0], proj[1], proj[2])
+    proj = projective(1500, 1500, width/2, height/2, coords[0], coords[1], coords[2])
+    return (proj[0], proj[1], proj[2]) # приблизиьт до 0.5, 0.3, 0.2
 
 
 def draw_polygon(img_mat, fv):
@@ -148,7 +148,7 @@ def draw_triangle_model(img_mat, z_buffer, fv):
     x3, y3, z3 = scaleCoords([x3, y3, z3])
 
     if cs < 0:
-        drawTriangle(img_mat, z_buffer, x1, y1, z1, x2, y2, z2, x3, y3, z3, (87, 69, light))
+        drawTriangle(img_mat, z_buffer, x1, y1, z1, x2, y2, z2, x3, y3, z3, (light, 69, light))
 
 
 def drawTriangle(img_mat, z_buffer, x0, y0, z0, x1, y1, z1, x2, y2, z2, color):
