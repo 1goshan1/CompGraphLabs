@@ -1,13 +1,25 @@
+import math
+
 import numpy as np
 from PIL import Image, ImageOps
 from math import sin, cos, pi, sqrt
+import random
 
-width, height = 2000, 2000
-
-def rotate(x, y, z, a, b, c, tx, ty, tz):
-    rx = np.array([[1, 0, 0], [0, cos(a), sin(a)], [0, -sin(a), cos(a)]])
-    ry = np.array([[cos(b), 0, sin(b)], [0, 1, 0], [-sin(b), 0, cos(b)]])
-    rz = np.array([[cos(c), -sin(c), 0], [sin(c), cos(c), 0], [0, 0, 1]])
+def rotate_matrix(x, y, z, a, b, c, tx, ty, tz):
+    rx = np.array([
+        [1, 0, 0],
+        [0, cos(a), sin(a)],
+        [0, -sin(a), cos(a)]
+    ])
+    ry = np.array([
+        [cos(b), 0, sin(b)],
+        [0, 1, 0],
+        [-sin(b), 0, cos(b)]
+    ])
+    rz = np.array([
+        [cos(c), -sin(c), 0],
+        [sin(c), cos(c), 0],
+        [0, 0, 1]])
 
     v = np.array([[x], [y], [z]])
 
@@ -18,6 +30,72 @@ def rotate(x, y, z, a, b, c, tx, ty, tz):
     v = v + np.array([[tx], [ty], [tz]])
 
     return list(np.transpose(v))[0]
+
+def rotate_quat(x, y, z, q, tx, ty, tz):
+    w, a, b, c = q
+    n = sqrt(w**2 + a**2 + b**2 + c**2)
+    w, a, b, c = w/n, a/n, b/n, c/n
+    v =  np.array([
+        [ 1 - 2 * (b**2 + c**2),  2*(a*b - w * c), 2 * (a*c + w * b) ],
+        [ 2 * (a*b + w * c) , 1 - 2*(a**2 + c**2) , 2 * (b * c + w * a) ],
+        [ 2 * (a*c - w * b) ,  2 * (b * c + w * a) ,  1 - 2 * (a**2 + b**2) ]
+    ])
+
+    vert = np.array([ [x], [y], [z] ])
+
+    v = np.dot(v, vert)
+
+    v = np.array(
+        [[tx],
+        [ty],
+        [tz]]
+    ) + v
+
+    return list(np.transpose(v))[0]
+
+
+def parse(file, a, b, c, tx, ty, tz, mode):
+    vt = []
+    v = []
+    fv = []
+    ft = []
+    for s in file:
+        s = s.split()
+
+        if s[0] == "vt": vt.append(list(map(float, s[1:])))
+        elif s[0] == "v":
+            coords = list(map(float, s[1:]))
+
+            if mode: coords[0], coords[1], coords[2] = rotate_matrix(coords[0], coords[1], coords[2], a, b, c, tx, ty, tz)
+            else: coords[0], coords[1], coords[2] = rotate_quat(coords[0], coords[1], coords[2], (0, a, b, c), tx, ty, tz)
+
+            v.append(coords)
+        elif s[0] == "f":
+            v_indices = []
+            vt_indices = []
+            for sp in s[1:]:
+                parts = sp.split('/')
+                v_indices.append(int(parts[0]))
+                if len(parts) > 1 and parts[1] != '':
+                    vt_indices.append(int(parts[1]))
+
+            fv.append(v_indices)
+            ft.append(vt_indices)
+
+    return v, fv, vt, ft
+
+
+
+
+width, height = 2000, 2000
+
+def Euler_to_quaternion(axis, degrees):
+    angle_in_rad = math.radians(degrees)
+    axis = np.array(axis) / np.linalg.norm(axis)
+    sin_halfangle = math.sin(angle_in_rad/2)
+    cos_halfangle = math.cos(angle_in_rad/2)
+    return [cos_halfangle, axis[0]*sin_halfangle, axis[1]*sin_halfangle, axis[2]*sin_halfangle]
+
 
 def calculateBarycentric(x, y, x0, y0, x1, y1, x2, y2):
     denominator = (x0 - x2) * (y1 - y2) - (x1 - x2) * (y0 - y2)
@@ -93,7 +171,7 @@ def compute_vertex_intensity(normal, light_dir=np.array([0.0, 0.0, 1.0])):
     return dot_product
 
 def drawTriangleTextured(img_mat, z_buffer, x0, y0, z0, x1, y1, z1, x2, y2, z2, 
-                        i0, i1, i2, u0, v0, u1, v1, u2, v2, texture):
+                        i0, i1, i2, u0, v0, u1, v1, u2, v2, texture, width_texture, height_texture):
     xmin, ymin, xmax, ymax = getXYMaxMin(x0, y0, x1, y1, x2, y2)
 
     for y in range(ymin, ymax + 1):
@@ -120,7 +198,7 @@ def drawTriangleTextured(img_mat, z_buffer, x0, y0, z0, x1, y1, z1, x2, y2, z2,
                     img_mat[y][x] = color
                     z_buffer[y][x] = z
 
-def draw_triangle_model(img_mat, z_buffer, fv, vertex_normals, vt, texture, ft):
+def draw_triangle_model(img_mat, z_buffer, fv, vertex_normals, vt, texture, ft, width_texture, height_texture):
     v0_idx = fv[0] - 1
     v1_idx = fv[1] - 1
     v2_idx = fv[2] - 1
@@ -147,49 +225,39 @@ def draw_triangle_model(img_mat, z_buffer, fv, vertex_normals, vt, texture, ft):
     u2, v2 = vt[vt2_idx]
 
     drawTriangleTextured(img_mat, z_buffer, sx1, sy1, sz1, sx2, sy2, sz2, sx3, sy3, sz3, 
-                        i0, i1, i2, u0, v0, u1, v1, u2, v2, texture)
+                        i0, i1, i2, u0, v0, u1, v1, u2, v2, texture, width_texture, height_texture)
+
+
+
+
+mode = input("Эйлер (1) / Квартернионы (0)")
+
+
+
 
 file = open("model_1.obj")
-v = []
-fv = []
-vt = []
-ft = [] # индексы текстурных координат  
 
-for s in file:
-    spl = s.split()
-    if spl[0] == "v":
-        coords = list(map(float, spl[1:]))
-        coords[0], coords[1], coords[2] = rotate(coords[0], coords[1], coords[2], 0, pi + pi / 4, 0, 0, -0.05, 0.1)
-        v.append(coords)
-    if spl[0] == "f":
-        v_indices = []
-        vt_indices = []
-        for sp in spl[1:]:
-            parts = sp.split('/')
-            v_indices.append(int(parts[0]))
-            if len(parts) > 1 and parts[1] != '':
-                vt_indices.append(int(parts[1]))
-                
-        fv.append(v_indices)
-        ft.append(vt_indices)
-    if spl[0] == "vt":
-        coords = list(map(float, spl[1:3]))
-        vt.append(coords)
+v, fv, vt, ft = parse(file, random.random(), random.random(), random.random(), 0, 0.00, 0.15, int(mode))
 
 vertex_normals = compute_vertex_normals(v, fv)
 
-img_mat = np.zeros((height, width, 3), dtype=np.uint8)
-z_buffer = np.full((height, width), float('inf'))
-
 texture_img = Image.open('bunny-atlas.jpg')
+
 texture = np.array(texture_img)
 width_texture = texture.shape[1]  # ширина текстуры
 height_texture = texture.shape[0]  # высота текстуры
 
+file.close()
+
+
+img_mat = np.zeros((height, width, 3), dtype=np.uint8)
+z_buffer = np.full((height, width), float('inf'))
+
+
 for i in range(len(fv)):
     pg = fv[i]
     pt = ft[i]
-    draw_triangle_model(img_mat, z_buffer, pg, vertex_normals, vt, texture, pt)
+    draw_triangle_model(img_mat, z_buffer, pg, vertex_normals, vt, texture, pt, width_texture, height_texture)
 
 img = Image.fromarray(img_mat, mode='RGB')
 img = ImageOps.flip(img)
